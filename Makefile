@@ -18,4 +18,4 @@ utils.o: utils.c utils.h
 	$(CC) -c $< -o $@
 
 clean:
-	rm -rf *.o mshell
+	rm -rf *.o mshell *.a
