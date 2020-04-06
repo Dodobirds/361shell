@@ -1,4 +1,5 @@
 #define _XOPEN_SOURCE 500
+#define _POSIX_C_SOURCE 200809L
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -56,6 +57,7 @@ int update_current_dir(struct shell_context* context, char* c)
   free(context->previous_dir);
   context->previous_dir = context->current_dir;
   context->current_dir = c;
+  setenv("PWD", c, 1);
   return 0;
 }
 
@@ -99,8 +101,40 @@ int find_command(char* command, struct list* path)
   }
   return f;
 }
+// Im not a fan of global variables
+// But signals are basically the most global thing you can imagine ._.
+int CHILD_PID = -1;
 
-int sh(int argc, char** argv, char** envp)
+void kill_child(int sig)
+{
+  if (CHILD_PID < 1) {
+    return;
+  }
+  else {
+    printf("Terminating [%d] by timeout\n", CHILD_PID);
+    kill(CHILD_PID, SIGTERM);
+  
+  }
+}
+
+
+int alarm_child(int pid, int timer)
+{
+  if (timer < 1) {
+    return 0;
+  }
+  CHILD_PID = pid;
+  struct sigaction act;
+  memset(&act, 0, sizeof(act));
+  act.sa_handler = kill_child;
+  
+
+  sigaction(SIGALRM, &act, 0);
+  alarm(timer);
+  return 0;
+}
+
+int sh(int argc, char** argv, char** envp, int timer)
 {
   struct shell_context* context = init_shell();
   
@@ -142,33 +176,30 @@ int sh(int argc, char** argv, char** envp)
       builtin_command(s_wordexp.we_wordc, args, context); 
     }
     else if (find_command(args[0], context->path) == 0) {
-      // check if path / inpath to prevent a bad fork
       if ((process = fork()) < 0) {
         fprintf(stderr, "Fork error\n");
         return 1;
       }
       else if ( process == 0) {
+        
         execvp(args[0], args);
         printf("This shouldn't happen (exec) \n");
         return 100;
       }
       else {
+        alarm_child(process, timer);
         int pid = 0;
         do {
           pid = waitpid(process, &status, 0);
         } while (pid == -1 && errno == EINTR);
-        /*
-        if ((process = waitpid(process, &status, 0)) < 0) {
-          perror("waitpid");
-          return 1;
-        }
-        */
         if (pid == -1) {
           perror("waitpid");
           return 1;
         }
-        else 
+        else {
           printf("Processes [%d] exited with [%d] \n", process, status);
+          alarm(0); // cancel alarm if the process exits first
+        }
       }
     }
     else {
@@ -190,9 +221,15 @@ int main(int argc, char** argv)
   struct sigaction act;
   memset(&act, 0, sizeof(act));
   act.sa_handler = IntHandle;
-
   sigaction(SIGINT, &act, 0);
   sigaction(SIGTSTP, &act, 0);
-  sh(argc, argv, NULL);
-  return 0;
+  
+  int timer = 0;
+  if (argc == 2) {
+    if (int_from(argv[1], &timer) != 0) {
+      printf("Bad arg \n");
+      return 0 ;
+    }
+  }
+  sh(argc, argv, NULL, timer);
 }

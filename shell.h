@@ -1,7 +1,7 @@
 #ifndef SHELL_H
 #define SHELL_H
 
-int sh(int, char**, char**);
+int sh(int, char**, char**, int);
 
 struct list;
 struct list* build_path();
