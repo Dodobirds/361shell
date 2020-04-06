@@ -105,8 +105,9 @@ int builtin_where(int argc, char** argv, struct shell_context* context)
   struct list* current = context->path;
     do {
       char* p = (char*)current->data;
-      if (is_in_dir(p, argv[count]) == 0) 
+      if (is_in_dir(p, argv[count]) == 0) {
         printf("%s/%s \n", p, argv[count]);
+      }
     } while ((current = current->next));
     ++count;
   }

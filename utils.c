@@ -14,13 +14,13 @@ char* read_input()
   char buffer[READ_LENGTH] = "";
   size_t buf_len, input_len = 0;
   do {
-    if (fgets(buffer, READ_LENGTH, stdin) < 0) {
-      return 0;
+    if (fgets(buffer, READ_LENGTH, stdin) == NULL) {
+      return NULL;
     }
     buf_len = strlen(buffer) + 1;
     str = realloc(str, input_len + buf_len);
     if (str == NULL) {
-      return 0;
+      return NULL;
     }
     strcpy(str+input_len, buffer);
     input_len += (buf_len - 1);

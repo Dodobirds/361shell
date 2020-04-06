@@ -9,6 +9,7 @@
 #include <signal.h>
 #include <limits.h>
 #include <errno.h>
+#include <sys/stat.h>
 
 #include "utils.h"
 #include "builtin.h"
@@ -81,6 +82,7 @@ struct shell_context* init_shell()
 
 int find_command(char* command, struct list* path)
 {
+  
   if (is_in_path(command, path) != NULL)
     return 0;
 
@@ -88,8 +90,10 @@ int find_command(char* command, struct list* path)
   int f = 1;
   if (strstr(command, "/") != NULL) {
     if ((fullpath = realpath(command,NULL)) != NULL) {
-      if (access(fullpath, X_OK) == 0)
-        f = 0;
+      struct stat stats;
+      if (stat(fullpath, &stats) == 0 && !(S_ISDIR(stats.st_mode)))
+        if (access(fullpath, X_OK) == 0)
+          f = 0;
     }
     free(fullpath);
   }
@@ -113,7 +117,11 @@ int sh(int argc, char** argv, char** envp)
     /*
      * Parse
      * */
-    commandline = read_input();
+    if ((commandline = read_input()) == NULL) {
+      printf("\n");
+      continue;
+    }
+
     if (wordexp(commandline, &s_wordexp, 0) != 0) {
       fprintf(stderr, "Could not parse commandline");
       return -1;
@@ -121,7 +129,8 @@ int sh(int argc, char** argv, char** envp)
     char** args = s_wordexp.we_wordv;
     
     if (args[0] == NULL) {
-      printf("\n");
+      free(commandline);
+      wordfree(&s_wordexp);
       continue;
     }
     
