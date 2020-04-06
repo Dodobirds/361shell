@@ -15,8 +15,6 @@
 #include "shell.h"
 #include "builtin.h"
 
-//returns a function
-
 int builtin_exit(int argc, char** argv, struct shell_context* context)
 {
   context->loop = 0;
@@ -43,12 +41,16 @@ int builtin_prompt(int argc, char** argv, struct shell_context* context)
   return update_prompt(context, prev);
 }
 
+
+// Check if file is in a given directory
 int is_in_dir(const char* dir, const char* file)
 {
   struct dirent *s_dirent;
   DIR *dir_handle;
-  if((dir_handle = opendir(dir)) == NULL) 
+  if((dir_handle = opendir(dir)) == NULL) { 
+    perror("Could not open directory");
     return -1;
+  }
    
   int file_fd = dirfd(dir_handle);
   while ((s_dirent = readdir(dir_handle)) != NULL) {
@@ -63,6 +65,7 @@ int is_in_dir(const char* dir, const char* file)
   return 1;
 }
 
+// Check if a command is in the PATH
 char* is_in_path(char* command, struct list* path)
 {
   do {
@@ -154,18 +157,23 @@ int builtin_pwd(int argc, char** argv, struct shell_context* context)
     return 0;
   }
   char* cwd = getcwd(NULL, 0);
+  if (cwd == NULL) {
+    perror("pwd");
+    return 1;
+  }
   printf("%s \n", cwd);
   free (cwd);
   return 0;
 }
 
+// Lists everything in a given directory
 int list_dir(char* dir) 
 {
   int count = 0;
   struct dirent *s_dirent;
   DIR *dir_handle;
   if((dir_handle = opendir(dir)) == NULL) {
-    printf("%s: Directory does not exist\n\n", dir); 
+    perror("Could not open directory");
     return -1;
   } 
   
@@ -180,8 +188,6 @@ int list_dir(char* dir)
   return count;
 }
 
-//TODO check if inputs are valid then print
-// probably just use the return of above and move the file thing
 int builtin_list(int argc, char** argv, struct shell_context* context)
 {
   if (argc == 1) {
@@ -227,7 +233,7 @@ int builtin_kill(int argc, char** argv, struct shell_context* context) {
     }
   }
   else {
-    fprintf(stderr, "Invalid args\n");
+    printf("Invalid args\n");
     return 0;
   }
   return kill(pid,sig);
@@ -260,6 +266,7 @@ int builtin_setenv(int argc, char** argv, struct shell_context* context) {
   char* key, *value = "";
   if (argc == 1) {
     builtin_printenv(argc, argv, context);
+    return 0;
   }
   else if (argc > 3) {
     fprintf(stderr, "Too many args\n");
@@ -276,6 +283,7 @@ int builtin_setenv(int argc, char** argv, struct shell_context* context) {
   return setenv(key, value, 1);
 }
 
+// Map command to function
 const struct builtin_command builtin_data[] = {
   {"prompt", &builtin_prompt},
   {"which", &builtin_which},

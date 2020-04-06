@@ -33,6 +33,8 @@ char* read_input()
   return str;
 }
 
+// int from string wrapper
+// Checks if input was a string or not
 int int_from(char* c, int* i)
 {
   char* endptr;
@@ -44,7 +46,11 @@ int int_from(char* c, int* i)
   return 0;
 }
 
-//Does not support complex (nested) lists
+
+/*
+ * Simple list library
+ * Mostly used to handle PATH
+ * */
 struct list* list_insert(struct list* head, void* val)
 {
   struct list *temp, *tail;

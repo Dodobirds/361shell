@@ -16,6 +16,7 @@
 #include "builtin.h"
 #include "shell.h"
 
+// Builds path-list from PATH
 struct list* build_path()
 {
   char* p = getenv("PATH");
@@ -38,6 +39,9 @@ struct list* build_path()
   return list;
 }
 
+/*
+ * Setters for the shell_context struct
+ * */
 int update_prompt(struct shell_context* context, char* c)
 {
   free(context->prompt);
@@ -82,6 +86,8 @@ struct shell_context* init_shell()
   return context;
 }
 
+//Checks if a command is valid
+//(in PATH, is a relative/absolute path, permissions, etc)
 int find_command(char* command, struct list* path)
 {
   
@@ -90,9 +96,12 @@ int find_command(char* command, struct list* path)
 
   char* fullpath;
   int f = 1;
+  //is a path
   if (strstr(command, "/") != NULL) {
-    if ((fullpath = realpath(command,NULL)) != NULL) {
+    //get the full path
+    if ((fullpath = realpath(command,NULL)) != NULL) { 
       struct stat stats;
+      //isn't a directory
       if (stat(fullpath, &stats) == 0 && !(S_ISDIR(stats.st_mode)))
         if (access(fullpath, X_OK) == 0)
           f = 0;
@@ -101,6 +110,10 @@ int find_command(char* command, struct list* path)
   }
   return f;
 }
+
+/*
+ * Signal handlers for shell timeout
+ * */
 // Im not a fan of global variables
 // But signals are basically the most global thing you can imagine ._.
 int CHILD_PID = -1;
@@ -116,7 +129,6 @@ void kill_child(int sig)
   
   }
 }
-
 
 int alarm_child(int pid, int timer)
 {
@@ -158,10 +170,12 @@ int sh(int argc, char** argv, char** envp, int timer)
 
     if (wordexp(commandline, &s_wordexp, 0) != 0) {
       fprintf(stderr, "Could not parse commandline");
-      return -1;
+      free(commandline);
+      continue;
     }
     char** args = s_wordexp.we_wordv;
-    
+   
+    // Empty string and EOF
     if (args[0] == NULL) {
       free(commandline);
       wordfree(&s_wordexp);
@@ -175,23 +189,29 @@ int sh(int argc, char** argv, char** envp, int timer)
     if ((builtin_command = find_builtin(args[0])) != NULL) {
       builtin_command(s_wordexp.we_wordc, args, context); 
     }
+
+    /*
+     * Check and run other programs
+     * */
     else if (find_command(args[0], context->path) == 0) {
       if ((process = fork()) < 0) {
-        fprintf(stderr, "Fork error\n");
+        perror("Fork Failed");
         return 1;
       }
       else if ( process == 0) {
         
-        execvp(args[0], args);
-        printf("This shouldn't happen (exec) \n");
+        if (execvp(args[0], args) == -1)
+          perror("Exec Failed");
         return 100;
       }
       else {
         alarm_child(process, timer);
+
         int pid = 0;
         do {
           pid = waitpid(process, &status, 0);
         } while (pid == -1 && errno == EINTR);
+        
         if (pid == -1) {
           perror("waitpid");
           return 1;
@@ -213,6 +233,7 @@ int sh(int argc, char** argv, char** envp, int timer)
   return 0;
 }
 
+//Ignoring signals
 void IntHandle(int sig) {
 }
 
